@@ -4,33 +4,34 @@ import (
   "fmt"
   "io/ioutil"
   "log"
-  "strconv"
 )
+
+type Directory struct {
+  name string
+  size int64
+}
+
+type Directories map[string]Directory
 
 func main() {
    directories := getDirectories()
 
-   for _, d := range directories {
-     fmt.Println(d)
+   for _,value := range directories {
+     fmt.Println(value.name)
+     fmt.Println(value.size)
    }
 }
 
-func getDirectories() []string {
+func getDirectories()Directories {
   files, err := ioutil.ReadDir("/usr/")
-  directories := []string{}
-
+  directories := make(Directories)
   if (err != nil) {
     log.Fatal(err)
   }
 
   for _, f := range files {
-    //fmt.Println(f.Name())
-    size := strconv.FormatInt(f.Size(), 10)
-    name := f.Name()
-    entry := name + ": " + size
-    //entry := strings.Join(f.Name(),": ", string(f.Size()))
-    //fmt.Println(f.Size())
-    directories = append(directories, entry)
+    directoryObj := Directory {name: f.Name(),size: f.Size()}
+    directories[f.Name()] = directoryObj
   }
 
   return directories
