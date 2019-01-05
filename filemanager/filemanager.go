@@ -16,10 +16,23 @@ type Directories map[string]Directory
 func main() {
    directories := getDirectories()
 
-   for _,value := range directories {
-     fmt.Println(value.name)
-     fmt.Println(value.size)
+   for {
+     //and now campare them!!
+     comparism := getDirectories()
+
+     for key,value := range comparism {
+       fmt.Println(value.name)
+       fmt.Println(value.size)
+
+       compared := value.size > directories[key].size || value.size < directories[key].size
+
+       fmt.Println("compare is", compared)
+
+       fmt.Println("___________________________________________")
+     }
    }
+
+
 }
 
 func getDirectories()Directories {
