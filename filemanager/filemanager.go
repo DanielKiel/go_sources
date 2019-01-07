@@ -14,29 +14,28 @@ type Directory struct {
 type Directories map[string]Directory
 
 func main() {
-   directories := getDirectories()
+  path := "/usr/"
+  directories := getDirectories(path)
 
-   for {
-     //and now campare them!!
-     comparism := getDirectories()
+  for {
+   //and now campare them!!
+   comparism := getDirectories(path)
 
-     for key,value := range comparism {
-       fmt.Println(value.name)
-       fmt.Println(value.size)
+   for key,value := range comparism {
+     fmt.Println(value.name)
+     fmt.Println(value.size)
 
-       compared := value.size > directories[key].size || value.size < directories[key].size
+     compared := value.size > directories[key].size || value.size < directories[key].size
 
-       fmt.Println("compare is", compared)
+     fmt.Println("compare is", compared)
 
-       fmt.Println("___________________________________________")
-     }
+     fmt.Println("___________________________________________")
    }
-
-
+  }
 }
 
-func getDirectories()Directories {
-  files, err := ioutil.ReadDir("/usr/")
+func getDirectories(path string)Directories {
+  files, err := ioutil.ReadDir(path)
   directories := make(Directories)
   if (err != nil) {
     log.Fatal(err)
