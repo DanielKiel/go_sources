@@ -6,7 +6,7 @@ import (
   "os"
   "io"
   "bytes"
-  "github.com/hpcloud/tail"
+  "bufio"
 )
 
 type Logs map[string]Log
@@ -46,9 +46,9 @@ func main() {
 
         log := Log{lines: lines}
         files[path] = log
+
+        show(path)
       }
-
-
     }
   }
 }
@@ -60,14 +60,17 @@ func check(e error) {
 }
 
 func show(path string) {
-  t, err := tail.TailFile(path, tail.Config{Follow: true,ReOpen:true})
+  file, err := os.Open(path)
 
   check(err)
 
-  for line := range t.Lines {
-      fmt.Println(line.Text)
+  defer file.Close()
+
+  scanner := bufio.NewScanner(file)
+
+  for scanner.Scan() {
+    fmt.Println(scanner.Text())
   }
-  fmt.Println(t.Lines,path)
 }
 
 func lineCounter(r io.Reader) (int, error) {
@@ -126,5 +129,4 @@ func getFiles(root string) Logs {
   }
 
   return logs
-
 }
