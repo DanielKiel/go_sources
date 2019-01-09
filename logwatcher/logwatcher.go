@@ -15,16 +15,17 @@ func main() {
   //fmt.Println(os.Getenv("SSH_USERNAME"))
 
   path := "/home/daniel/Public/"
+  stream := fm.Stream(path)
   //initial files getting
-  files := fm.GetFiles(path)
-
-  for path,file := range files {
-    fmt.Println(path, file.Lines)
-  }
+  //files := <- stream//fm.GetFiles(path)
 
   //watch them
   for {
-    for path,file := range files {
+    for path,file := range <- stream {
+      fmt.Println(path, file.Lines)
+    }
+
+    for path,file := range <- stream {
 
       reader, err := os.Open(path)
 
@@ -42,8 +43,8 @@ func main() {
         fmt.Println("now",lines)
         fmt.Println("___________________________")
 
-        log := fm.Log{Lines: lines}
-        files[path] = log
+        //log := fm.Log{Lines: lines}
+        //files[path] = log
 
         //show(path)
       }

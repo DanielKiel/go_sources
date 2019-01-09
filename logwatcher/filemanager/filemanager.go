@@ -21,6 +21,25 @@ func check(e error) {
   }
 }
 
+func Stream(path string) <- chan Logs {
+  logs := GetFiles(path)
+
+  out := make(chan Logs)
+
+  go func() {
+
+    out <- logs
+
+    for {
+      logs := GetFiles(path)
+      out <- logs
+    }
+
+  }()
+
+  return out
+}
+
 func Show(path string) {
   file, err := os.Open(path)
 
