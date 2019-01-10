@@ -12,6 +12,7 @@ import (
 type Logs map[string]Log
 
 type Log struct {
+  Path string
   Lines int
 }
 
@@ -21,18 +22,15 @@ func check(e error) {
   }
 }
 
-func Stream(path string) <- chan Logs {
-  logs := GetFiles(path)
-
-  out := make(chan Logs)
+func Stream(path string) <- chan Log {
+  out := make(chan Log)
 
   go func() {
-
-    out <- logs
-
     for {
       logs := GetFiles(path)
-      out <- logs
+      for _,log := range logs {
+        out <- log
+      }
     }
 
   }()
@@ -100,7 +98,7 @@ func GetFiles(root string) Logs {
 
         check(err)
 
-        log := Log{Lines: lines}
+        log := Log{Lines: lines, Path: path}
         logs[ident] = log
       }
       return nil
