@@ -1,9 +1,10 @@
 package main
 
 import (
-  //"fmt"
+  "fmt"
   "os"
   "encoding/csv"
+  "encoding/json"
   "bufio"
   "io"
 	"crypto/aes"
@@ -12,7 +13,15 @@ import (
 	"crypto/rand"
 	"encoding/hex"
   "encoding/base64"
+  "net/http"
+  "time"
+  "io/ioutil"
 )
+
+type Message struct {
+  Name string `json:"name"`
+  Foo string `json:"foo"`
+}
 
 func main() {
   //reader := read("./Downloads/my_test_2.csv")
@@ -62,6 +71,23 @@ func read(path string) <- chan []string {
       check(error)
 
       line[5] = decrypted
+
+      myClient := &http.Client{Timeout:60 * time.Second}
+      resp, err := myClient.Get("http://192.168.1.4:80")
+
+      check(err)
+      defer resp.Body.Close()
+
+      //var message Message
+      body, err := ioutil.ReadAll(resp.Body)
+      check(err)
+
+      var message Message
+      js := json.Unmarshal(body,&message)
+      check(js)
+fmt.Println(message.Name,message.Foo)
+      //line[6] = message.Name
+      //line[7] = message.Foo
 
       out <- line
     }
