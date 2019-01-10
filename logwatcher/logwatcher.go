@@ -2,54 +2,41 @@ package main
 
 import (
   "fmt"
-  "path/filepath"
   "os"
-  "io"
-  "bytes"
-  "bufio"
+  fm "logwatcher/filemanager"
+  "github.com/subosito/gotenv"
+  "golang.org/x/crypto/ssh"
 )
 
-type Logs map[string]Log
 
-type Log struct {
-  lines int
-}
 
 func main() {
+  //fmt.Println(os.Getenv("SSH_USERNAME"))
+
   path := "/home/daniel/Public/"
+  stream := fm.Stream(path)
   //initial files getting
-  files := getFiles(path)
-
-  for path,file := range files {
-    fmt.Println(path, file.lines)
-  }
-
-  //watch them
+  //files := <- stream//fm.GetFiles(path)
+  //fmt.Println(file.Path, file.Lines)
   for {
-    for path,file := range files {
+      file := <- stream
 
-      reader, err := os.Open(path)
-
-      check(err)
-
-      lines, err := lineCounter(reader)
+      reader, err := os.Open(file.Path)
 
       check(err)
 
-      if (lines > file.lines || lines < file.lines) {
+      lines, err := fm.LineCounter(reader)
+
+      check(err)
+
+      if (lines > file.Lines || lines < file.Lines) {
 
         fmt.Println("___________________________")
         fmt.Println("changes detected")
-        fmt.Println(path, file.lines)
+        fmt.Println(file.Path, file.Lines)
         fmt.Println("now",lines)
         fmt.Println("___________________________")
-
-        log := Log{lines: lines}
-        files[path] = log
-
-        show(path)
       }
-    }
   }
 }
 
@@ -59,74 +46,27 @@ func check(e error) {
   }
 }
 
-func show(path string) {
-  file, err := os.Open(path)
+func connectToHost(host string) (*ssh.Client, *ssh.Session, error) {
+  gotenv.Load()
+	user := os.Getenv("SSH_USERNAME")
+  pass := os.Getenv("SSH_PASSWORD")
 
-  check(err)
+	sshConfig := &ssh.ClientConfig{
+		User: user,
+		Auth: []ssh.AuthMethod{ssh.Password(pass)},
+	}
+	sshConfig.HostKeyCallback = ssh.InsecureIgnoreHostKey()
 
-  defer file.Close()
+	client, err := ssh.Dial("tcp", host, sshConfig)
+	if err != nil {
+		return nil, nil, err
+	}
 
-  scanner := bufio.NewScanner(file)
+	session, err := client.NewSession()
+	if err != nil {
+		client.Close()
+		return nil, nil, err
+	}
 
-  for scanner.Scan() {
-    fmt.Println(scanner.Text())
-  }
-}
-
-func lineCounter(r io.Reader) (int, error) {
-  buf := make([]byte, 32*1024)
-  count := 0
-  lineSep := []byte{'\n'}
-
-  for {
-      c, err := r.Read(buf)
-      count += bytes.Count(buf[:c], lineSep)
-
-      switch {
-      case err == io.EOF:
-          return count, nil
-
-      case err != nil:
-          return count, err
-      }
-  }
-}
-
-func getFiles(root string) Logs {
-  logs := make(Logs)
-
-  err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-      //fmt.Println(filepath.Dir(path))
-      ident, miss := filepath.Abs(path)
-
-      if (miss != nil) {
-        fmt.Println(miss)
-      }
-
-      //check if the key already exists
-      _,exists := logs[ident]
-
-      if (exists) {
-        fmt.Println("we must handle the error here")
-      }
-
-      if (filepath.Ext(path) == ".log") {
-        reader, err := os.Open(path)
-
-        check(err)
-
-        lines, err := lineCounter(reader)
-
-        check(err)
-
-        log := Log{lines: lines}
-        logs[ident] = log
-      }
-      return nil
-  })
-  if err != nil {
-      panic(err)
-  }
-
-  return logs
+	return client, session, nil
 }
