@@ -16,7 +16,13 @@ import (
   "net/http"
   "time"
   "io/ioutil"
+  "runtime"
+  "sync/atomic"
 )
+
+const CHANELBUFFER = 14
+const WORKER = 12
+const WRITTEN = 0
 
 type Message struct {
   Name string `json:"name"`
@@ -24,76 +30,135 @@ type Message struct {
 }
 
 func main() {
-  //reader := read("./Downloads/my_test_2.csv")
-  write("./Creates/my_test_decrypted.csv", read("./Downloads/my_test_encrypted.csv"))
+  fmt.Println(runtime.NumCPU())
+  runtime.GOMAXPROCS(40)
+  now := time.Now()
+
+
+  readedChan :=read("./Downloads/my_test_encrypted.csv")
+
+  appendedChan := addData(readedChan)
+
+  write("./Creates/my_test_decrypted.csv", appendedChan, now)
+
+  select{}
 }
 
-func write(path string, reader <- chan[] string) {
+func addData(readedChan <- chan[] string) <- chan []string {
+  appendedChan := make(chan []string, CHANELBUFFER)
+  var counter uint64
+
+  for worker := 0; worker < WORKER; worker++ {
+    go appendLines(readedChan, appendedChan, &counter)
+  }
+
+  return appendedChan
+}
+
+func appendLines(readedChan <- chan[] string, appendedChan chan <- [] string, counter *uint64) {
+
+  for line := range readedChan {
+    atomic.AddUint64(counter, 1)
+    myClient := &http.Client{Timeout:90 * time.Second}
+    resp, err := myClient.Get("http://192.168.1.4:80")
+
+    if (err != nil) {
+      continue
+    }
+    defer resp.Body.Close()
+
+    //var message Message
+    body, err := ioutil.ReadAll(resp.Body)
+    check(err)
+
+    var message Message
+    js := json.Unmarshal(body,&message)
+    check(js)
+
+    line = append(line, message.Name)
+    line = append(line, message.Foo)
+
+    i := atomic.LoadUint64(counter)
+    fmt.Println("appended", i)
+
+    appendedChan <- line
+  }
+}
+
+func write(path string, appendedChan <- chan[] string, now time.Time) {
   file, err := os.Create(path)
 
   check(err)
 
-  defer file.Close()
+  //defer file.Close()
 
   writer := csv.NewWriter(file)
   defer writer.Flush()
+  var counter uint64
 
-  for line := range reader {
+  for worker := 0; worker < WORKER; worker++ {
+    go writeLines(writer, appendedChan,now,&counter)
+  }
+
+}
+
+func writeLines(writer *csv.Writer, writeChan <- chan [] string, now time.Time, counter *uint64) {
+
+  for line := range writeChan {
+    atomic.AddUint64(counter, 1)
     //encrypted, error := encrypt("new val", "0123456789012345")
     //check(error)
     //line := append(line, encrypted)
 
     err := writer.Write(line)
     check(err)
+
+    t1 := time.Now()
+    i := atomic.LoadUint64(counter)
+	  fmt.Printf("________________we have %n items at  %v to run.\n",i, t1.Sub(now))
+
+    fmt.Println(line)
+    i++
   }
 }
 
 func read(path string) <- chan []string {
-
-  out := make(chan []string)
+  out := make(chan []string, CHANELBUFFER)
   csvFile, err := os.Open(path)
   check(err)
 
-  go func() {
-    reader := csv.NewReader(bufio.NewReader(csvFile))
+  reader := csv.NewReader(bufio.NewReader(csvFile))
+  var counter uint64
+  for worker := 0; worker < WORKER; worker++ {
+    go readLines(reader, out, &counter)
+  }
 
-    for {
-      line, err := reader.Read()
-
-      if (err == io.EOF) {
-        close(out)
-        break
-      }
-
-      check(err)
-
-      decrypted, error := decrypt(line[5], "0123456789012345")
-      check(error)
-
-      line[5] = decrypted
-
-      myClient := &http.Client{Timeout:60 * time.Second}
-      resp, err := myClient.Get("http://192.168.1.4:80")
-
-      check(err)
-      defer resp.Body.Close()
-
-      //var message Message
-      body, err := ioutil.ReadAll(resp.Body)
-      check(err)
-
-      var message Message
-      js := json.Unmarshal(body,&message)
-      check(js)
-fmt.Println(message.Name,message.Foo)
-      //line[6] = message.Name
-      //line[7] = message.Foo
-
-      out <- line
-    }
-  }()
 
   return out
+}
+
+func readLines(reader *csv.Reader, readedChan chan <-[] string, counter *uint64) {
+  for {
+    line, err := reader.Read()
+    atomic.AddUint64(counter, 1)
+
+    if (err == io.EOF) {
+      close(readedChan)
+      break
+    }
+
+    check(err)
+
+    decrypted, error := decrypt(line[5], "0123456789012345")
+    check(error)
+
+    line[5] = decrypted
+
+    i := atomic.LoadUint64(counter)
+    fmt.Println("___readed", i)
+
+    readedChan <- line
+  }
 }
 
 func encrypt(message string, passphrase string) (encmessage string, err error) {
